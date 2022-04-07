@@ -1,0 +1,222 @@
+openapi: 3.0.3
+info:
+  contact:
+    email: "api.inquiry@expert.ai"
+    name: "expert.ai"
+    url: "https://expert.ai/"
+  description: |
+    Expert.ai Extract provides layout recognition for PDF documents by detecting and extracting:
+    
+    - Text with reading order
+    - Titles and headings
+    - Headers and footers
+    - Tables
+    - Document metadata
+    - Pages count
+    
+    The textual elements are returned together with the number of the page in which they occur and their bounding box.
+  title: "expert.ai Extract"
+  version: "beta"
+externalDocs:
+  description: "API documentation"
+  url: "https://docs.expert.ai/extract/beta/"
+servers:
+  - url: "http://extract.expert.ai/beta"
+paths:
+  /layout-document-async:
+    post:
+      description: |
+        Asynchronous layout recognition.  
+        The response body is a JSON object containing the ID of the recognition task. The task ID must be used in the URL of the `status` resource.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LayoutRequest"
+        description: "The document to be analyzed"
+      responses:
+        '202':
+          description: "Accepted"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LayoutDocumentAsyncResponse'
+        '400':
+          description: "Bad Request"
+        '401':
+          description: "Unauthorized"
+        '403':
+          description: "Forbidden"
+        '404':
+          description: "Not Found"
+        '405':
+          description: "Method Not Allowed"
+        '413':
+          description: "Request Entity Too Large"
+        '500':
+          description: "Internal Server Error"
+      security:
+        - bearerAuth: []
+  /status/{task-id}:
+    get:
+      description: |
+        Returns the status of the layout recognition task or, if the task is finished, the results of the task.  
+        The task ID is that returned by the `layout-document-async` resource.
+      parameters:
+        - name: "task-id"
+          description: "Recognition task ID"
+          required: true
+          in: "path"
+          schema:
+            type: "string"
+      responses:
+        '200':
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecognitionTaskOutput'
+        '401':
+          description: "Unauthorized"
+        '403':
+          description: "Forbidden"
+        '404':
+          description: "Not Found"
+        '405':
+          description: "Method Not Allowed"
+        '500':
+          description: "Internal Server Error"
+      security:
+        - bearerAuth: []
+components:
+  schemas:
+    LayoutRequest:
+      description: "Layout request"
+      properties:
+        document:
+          description: "Input document"
+          properties:
+            name:
+              description: "Document name"
+              type: "string"
+            data:
+              description: "Base64 encoding of document bytes"
+              type: "string"
+          required:
+            - "name"
+            - "data"
+      required:
+        - "document"
+    LayoutDocumentAsyncResponse:
+      description: "Asynchronous layout recognition response."
+      properties:
+        taskId:
+          description: |
+            ID of the asyncronous recognition task.  
+            Use it in the URL of the `status` resource.
+          type: "string"
+    LayoutItem:
+      description: "Layout element"
+      properties:
+        id:
+          description: "Element ID"
+          type: "integer"
+        page:
+          description: "Element page"
+          type: "integer"
+        children:
+          description: "List of child elements"
+          type: "array"
+          items:
+            type: "integer"
+        type:
+          description: "Element type (\"page\", \"title\", \"text\", \"header\", \"footer\", \"table\", \"cell\")"
+          type: "string"
+        parent:
+          description: "Parent element ID"
+          type: "integer"
+        label:
+          description: "Element label (experimental)"
+          type: "string"
+        content:
+          description: "Boxed element text"
+          type: "string"
+        bbox:
+          description: |
+            Bounding box coordinates in pixels: upper left corner X, upper left corner Y, lower right corner X and lower right corner Y.
+            Coordinates are referred to a 100 DPI (dots per inch) rendering of the page. The coordinates origin is at the top left corner of the rendered page.
+          type: "array"
+          items:
+            type: "integer"
+        row:
+          description: "(For table cells) Cell row"
+          type: "integer"
+        column:
+          description: "(For table cells) Cell column"
+          type: "integer"
+        isHEad:
+          description: "(For table cells) true if cell is a column heading, false otherwise"
+          type: "boolean"
+        span:
+          description: "(For table cells) Column and row span or null"
+          type: "array"
+          nullable: true
+          items:
+            type: "integer"
+    RecognitionTaskOutput:
+      description: "Status response"
+      properties:
+        current:
+          description: "Percentage of work done by the recognition task"
+          type: "integer"
+        message:
+          description: "Recognition phase (e.g. \"classification\", \"complete\") or error message"
+          type: "string"
+        result:
+          description: "Recognition result"
+          properties:
+            header:
+              description: "General document and recognition information"
+              properties:
+                conversionDateTime:
+                  description: "Recognition task date and time"
+                  type: "string"
+                customInfo:
+                  description: "Custom information about the document, for example the author and the creation date of a PDF document"
+                  type: "object"
+                documentName:
+                  description: "Document name"
+                  type: "string"
+                errorPages:
+                  description: "Number of pages that couldn't be processed"
+                  type: "integer"
+                metadata:
+                  description: "Document metadata"
+                  type: "array"
+                  items:
+                    type: "object"
+                totPages:
+                  description: "Total number of pages"
+                  type: "integer"
+                version:
+                  description: "Recognition software version"
+                  type: "string"
+            layout:
+              description: "Layout elements"
+              type: "array"
+              items:
+                $ref: '#/components/schemas/LayoutItem'
+            words:
+              description: "Encoded words"
+              type: "array"
+              items:
+                description: "Page words, compressed and endoced. Read the documentation to learn how to decode this information."
+                type: "string"
+        state:
+          description: "Status message (e.g. \"PENDING\", \"PROGRESS\", \"FAILURE\", \"SUCCESS\", \"ABORTED\")"
+          type: "string"
+  securitySchemes:
+    bearerAuth:
+      bearerFormat: "JWT"
+      scheme: "bearer"
+      type: "http"
